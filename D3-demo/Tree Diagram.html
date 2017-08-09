@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Tree Diagram</title>
+  <script type="text/javascript" src="d3/d3.v3.js"></script>
+  <style type="text/css">
+
+    .node circle {
+      fill: #fff;
+      stroke: steelblue;
+      stroke-width: 1.5px;
+    }
+
+    .node {
+      font: 12px sans-serif;
+    }
+
+    .link {
+      fill: none;
+      stroke: #ccc;
+      stroke-width: 1.5px;
+    }
+  </style>
+</head>
+<body>
+<script type="text/javascript">
+
+  var width = 500,
+      height = 500;
+
+// 装换数据
+  var tree = d3.layout.tree()
+                      .size([width,height-200])  //尺寸大小
+                      .separation(function(a,b){  //设置相邻节点a，b的间隔
+                        return (a.parent === b.parent ? 1:2);
+                      });
+
+// 对角线生成器
+  var diagonal = d3.svg.diagonal()
+                       .projection( function(d){ //利用投影函数进行坐标变换，x和y坐标对调，制作一个横向树状图（默认为竖向）
+                        return [d.y,d.x];
+                       });
+  
+  var svg = d3.select('body')   
+              .append("svg")
+              .attr('width', width)
+              .attr('height',height )
+              .append("g")
+              .attr('transform',"translate(40,0)" ); //水平移动40
+
+
+  d3.json("city_tree.json", function(error, root) {
+
+    var nodes = tree.nodes(root);  //读取节点内容
+    var links = tree.links(nodes);  //读取连接线内容
+
+  // 控制台查看节点连线内容
+    console.log(nodes);
+    console.log(links);
+
+// 连线
+    var link = svg.selectAll(".link")
+                  .data(links)
+                  .enter()
+                  .append("path")
+                  .attr("class","link")
+                  .attr('d',diagonal); //调用对角线生成器
+
+  // 节点
+    var node = svg.selectAll(".node")
+                  .data(nodes)
+                  .enter()
+                  .append("g")
+                  .attr("class","node")
+                  .attr("transform",function(d){
+                    return "translate(" + d.y + "," + d.x + ")";  //节点跟上连线的步伐
+                  });
+
+    node.append('circle')
+        .attr("r",4.5);
+
+    node.append("text")
+        .attr("dx",function(d){
+          return d.children ? -8 : 8;  //当前节点为叶子节点时文字在节点右边，否则在左边
+        })
+        .attr('dy', ".3em" )
+        .style('text-anchor', function(d){
+          return d.children ? "end" : 'start';  //当前节点为叶子节点时文字锚点在起始处，否则在末尾
+        })
+        .text(function(d){
+          return d.name;
+        });
+  });
+
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>div tooltip</title>
+<script src="d3/d3.v3.js"></script>
+<style type="text/css">
+  p{
+    width: 200px;
+    text-align: center;
+    border: 1px solid #000;
+    padding: 5px;
+  }
+
+  p:hover{
+    cursor: pointer;
+  }
+  
+  #tooltip{
+    position: absolute;
+    width: 200px;
+    height: auto;
+    padding: 10px;
+
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.4);
+
+    pointer-events: none;
+  }
+
+  #tooltip.hidden{
+    display: none;
+  }
+
+  #tooltip p{
+    margin: 0;
+    font-family: sans-serif;
+    font-size: 16px;
+    line-height: 20px;
+    text-align: left;
+    border: none;
+  }
+
+  rect:hover {
+    fill: orange;
+  }
+
+  text{
+    pointer-events: none;
+  }
+
+</style>
+</head>
+<body>
+  <div>
+    <p id="add">Add a new data value</p>
+    <p id="remove">Remove a data value</p>
+    <p id="sort">Sort</p>
+  </div>
+
+  <!-- tooltip位置属性为absolute，是以body为参考的，所以后面坐标有一些hack的味道 -->
+  <div id="tooltip" class="hidden">
+    <p><strong>Important Label Heading</strong></p>
+    <p><span id="value">100</span>%</p>
+  </div>
+    <script type="text/javascript">
+
+      //设置svg的宽和高
+      var h = 250;
+      var w = 600;
+
+      //设置初始数据
+      var dataset = [ { key: 0, value: 5 },   
+              { key: 1, value: 10 },    
+              { key: 2, value: 13 },
+              { key: 3, value: 19 },
+              { key: 4, value: 21 },
+              { key: 5, value: 25 },
+              { key: 6, value: 22 },
+              { key: 7, value: 18 },
+              { key: 8, value: 15 },
+              { key: 9, value: 13 },
+              { key: 10, value: 11 },
+              { key: 11, value: 12 },
+              { key: 12, value: 15 },
+              { key: 13, value: 20 },
+              { key: 14, value: 18 },
+              { key: 15, value: 17 },
+              { key: 16, value: 16 },
+              { key: 17, value: 18 },
+              { key: 18, value: 23 },
+              { key: 19, value: 25 } ];
+
+
+      //比例尺的创建
+      var xScale = d3.scale.ordinal()//序数比例尺
+              .domain(d3.range(dataset.length))//d3.range生成连续数值数组
+              .rangeRoundBands([0, w], 0.05);//输出的值被舍入到最接近的整数，0.05为行间距，大小为宽度的0.05%
+
+      var yScale = d3.scale.linear()//线性比例尺
+              .domain([0,d3.max(dataset,function(d){
+                return d.value;})])
+              .range([0,h]);
+
+      //定义键函数，读取了传入参数d的key值
+      var key = function(d){
+        return d.key;
+      }
+
+      //创建svg画布
+      var svg = d3.select('body')
+            .append('svg')
+            .attr('width', w )
+            .attr('height', h );
+
+      //创建柱形图
+      svg.selectAll("rect")    
+         .data(dataset,key)//数据用data()绑定到DOM时，通过传入两个参数dataset与key实现数据和键的连接（一一对应的关系）
+         .enter()
+         .append("rect")
+         .attr("x",function(d,i){
+          return xScale(i);//xscale是一个数组，输出i对应的值
+         })
+         .attr("y",function(d){
+          return h - yScale(d.value);//svg的坐标原点是左上角，所以用h-条形图得到y坐标，这样可以让条形图考卷底端而不是顶端
+         })
+         .attr("width",xScale.rangeBand())//rangeRoundBands()已经设置了间距，所以直接用
+         .attr("height",function(d){
+          return yScale(d.value);
+         })
+         .attr("fill",function(d){
+          return "rgb(0,0," + (d.value*10) + ")";
+         })
+         .on("mouseover",function(d,i){
+
+          //设置tooltip的坐标位置
+          var xPosition = parseFloat(d3.select(this).attr("x")) + xScale.rangeBand()/2 + 8;//用this指示当前选中的元素
+          var yPosition = h - yScale(d.value)/2 + 154;
+
+          d3.select("#tooltip")
+          .style("left",xPosition + "px")
+          .style("top",yPosition + "px")
+          .select("#value")
+          .text(d.value);
+
+          d3.select("#tooltip").classed("hidden",false);
+        })
+         .on("mouseout",function(){
+          d3.select("#tooltip").classed("hidden",true);
+        });
+
+
+      //设置标签
+      svg.selectAll('text')
+         .data(dataset,key)
+         .enter()
+         .append("text")
+         .text(function(d){
+          return d.value;
+         })
+         .attr('text-anchor',"middle")
+         .attr("x",function(d,i){
+          return xScale(i) + xScale.rangeBand() / 2;
+         })
+         .attr("y",function(d){
+          return h - yScale(d.value) + 14;
+         })
+         .attr("font-family","san-serif")
+         .attr('font-size',"11px")
+         .attr("fill","white");
+
+
+      d3.selectAll('p')//绑定click事件
+        .on("click",function(){
+
+          var paragraphID = d3.select(this).attr("id");
+
+          if(paragraphID === "add"){
+            var maxValue = 25;//  25*10 < 255
+            var newNumber = Math.floor(Math.random()*maxValue);//设置不大于25的随机数字
+            var lastKeyValue = dataset[dataset.length -1].key;
+            console.log(lastKeyValue);
+
+            //push()一个新的对象
+            dataset.push({
+              key:lastKeyValue + 1,
+              value: newNumber
+            });
+          }else if(paragraphID === "remove"){
+            dataset.shift();
+          };
+
+
+          //更新比例尺的定义域
+          xScale.domain(d3.range(dataset.length));
+          yScale.domain([0,d3.max(dataset,function(d){
+            return d.value;
+          })]);
+
+          //数据值比元素值多的情况下，加入元素集会引用尚不存在的占位元素
+          //元素比数据值值多的情况下，退出元素集会引用没有对应数据的元素
+
+
+          //选择所有条形图并把新数据进行绑定，注意是绑定数据，在视图层方面还没有进行更新
+          var bars = svg.selectAll('rect')
+            .data(dataset,key);
+
+          //加入一个新的条形图，只不过x方向定位是w，在视图层外，不可见
+          bars.enter()
+            .append("rect")
+            .attr("x",w)
+            .attr("y",function(d){
+              return h - yScale(d.value);
+            })
+            .attr("width",xScale.rangeBand())
+            .attr("height",function(d){
+              return yScale(d.value);
+            })
+            .attr("fill",function(d){
+              return "rgb(0,0," + (d.value*10) + ")";
+            })
+            .on("mouseover",function(d,i){
+              var xPosition = parseFloat(d3.select(this).attr("x")) + xScale.rangeBand()/2 + 8;
+              var yPosition = h - yScale(d.value)/2 + 154;
+
+              d3.select("#tooltip")
+              .style("left",xPosition + "px")
+              .style("top",yPosition + "px")
+              .select("#value")
+              .text(d.value);
+
+              d3.select("#tooltip").classed("hidden",false);
+            })
+            .on("mouseout",function(){
+              d3.select("#tooltip").classed("hidden",true);
+            });
+
+          //利用一个动画更新可见区域，数据的个数发生改变，整体视图层进行动画改变
+          bars.transition()
+              .duration(500)
+              .ease("bounce")
+              .attr('x',function(d,i){
+                return xScale(i);
+              })
+              .attr("y",function(d){
+              return h - yScale(d.value);
+              })
+              .attr("width",xScale.rangeBand())
+              .attr("height",function(d){
+                return yScale(d.value);
+              });
+
+          //退出的动画效果
+          bars.exit()
+              .transition()
+              .duration(500)
+              .ease("bounce")
+              .attr("x",-xScale.rangeBand())//整体向左（因为是负值）移动一个宽度的距离
+              .remove();
+
+
+          var labels = svg.selectAll("text")
+                          .data(dataset,key);
+
+          labels.enter()
+                .append("text")
+                .text(function(d){
+                  return d.value;
+                 })
+                .attr('text-anchor',"middle")
+                .attr("x",w)
+                .attr("y",function(d){
+                  return h - yScale(d.value) + 14;
+                 })
+                .attr("font-family","san-serif")
+                .attr('font-size',"11px")
+                .attr("fill","white");
+
+          labels.transition()
+                .duration(500)
+                .ease("bounce")
+                .attr('x',function(d,i){
+                  return xScale(i) + xScale.rangeBand()/2;
+                })
+                .attr("y",function(d){
+                  return h - yScale(d.value) + 14;
+                });
+
+          labels.exit()
+                .transition()
+                .duration(500)
+                .ease("bounce")
+                .attr("x",-xScale.rangeBand())
+                .remove();   
+
+        });
+
+
+      //为sort按钮定义排序函数  
+      d3.select("#sort")
+        .on("click",function(){
+          sortBars();
+        });
+
+        var sortOrder = false; 
+
+        var sortBars = function(){
+
+          sortOrder = !sortOrder;
+
+          svg.selectAll("rect")
+          .sort(function(a,b){
+            if(sortOrder){
+              return d3.ascending(a.value,b.value);
+            }else{
+              return d3.descending(a.value,b.value);
+            }
+          })
+          .transition()
+          .delay(function(d,i){//为每个矩形添加延迟
+            return i * 50;
+          })
+          .duration(1000)
+          .attr("x",function(d,i){
+            return xScale(i);
+          });
+
+          svg.selectAll("text")
+          .sort(function(a,b){
+            if(sortOrder){
+              return d3.ascending(a.value,b.value);
+            }else{
+              return d3.descending(a.value,b.value);
+            }
+          })
+          .transition()
+          .delay(function(d,i){
+            return i * 50;
+          })
+          .duration(1000)
+          .attr("x",function(d,i){
+            return xScale(i) + xScale.rangeBand()/2;
+          });
+        };
+    </script>
+</body>
+</html>

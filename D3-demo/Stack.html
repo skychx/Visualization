@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Stack</title>
+  <script src="d3/d3.v3.js"></script>
+  <style type="text/css">
+    /* 定义坐标轴样式 */
+    .axis path,
+    .axis line{
+      fill: none;
+
+      /* 外轮廓颜色 */
+      stroke: black;
+
+      /* 指定SVG元素<path>的渲染模式。
+      crispEdges偏向更加清晰锐利的边缘的渲染。浏览器在渲染的时候会关闭反锯齿模式，且会让线条的位置和宽度和显示器边缘对齐。（锐度） */
+      shape-rendering: crispEdges;
+    }
+    .axis text{
+      font-family: sans-serif;
+      font-size: 11px;
+    }
+
+    /* 提示条样式 */
+    #tooltip{
+      position: absolute;
+      width: 250px;
+      height: auto;
+      padding: 10px;
+
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 4px 4px 10px rgba(0,0,0,0.4);
+
+      pointer-events: none;
+    }
+
+    #tooltip.hidden{
+      display: none;
+    }
+
+    #tooltip p{
+      margin: 0;
+      font-family: sans-serif;
+      font-size: 16px;
+      line-height: 20px;
+      text-align: left;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="tooltip" class="hidden">
+    <p><strong>Important Label Heading</strong></p>
+    <p><span id="profit">100</span></p>
+  </div>
+  <script type="text/javascript">
+
+// 原始数据
+      var width = 800;
+      var height = 500;
+
+      var dataset = [
+      { name: "PC" , 
+       sales: [ { year:2005, profit: 3000 },
+                { year:2006, profit: 1300 },
+                { year:2007, profit: 3700 },
+                { year:2008, profit: 4900 },
+                { year:2009, profit: 700 }] },
+      { name: "SmartPhone" , 
+       sales: [ { year:2005, profit: 2000 },
+                { year:2006, profit: 4000 },
+                { year:2007, profit: 1810 },
+                { year:2008, profit: 6540 },
+                { year:2009, profit: 2820 }] },
+      { name: "Software" , 
+       sales: [ { year:2005, profit: 1100 },
+                { year:2006, profit: 1700 },
+                { year:2007, profit: 1680 },
+                { year:2008, profit: 4000 },
+                { year:2009, profit: 4900 }] }
+      ];
+
+// 转化数据
+      var stack = d3.layout.stack()
+                           .values(function(d){ return d.sales;})
+                           .x(function(d){ return d.year;})
+                           .y(function(d){ return d.profit;});
+
+      var data = stack(dataset);
+      console.log(data);
+
+// 设置svg的padding
+      var padding = { left:50,right:100,top:30,bottom:30};
+
+// 建立比例尺
+
+  // 条形图范围
+      var xRangeWidth = width - padding.left - padding.right;
+  // x比例尺
+      var xScale = d3.scale.ordinal()
+                           .domain(data[0].sales.map(function(d){ return d.year;})) //利用map进行映射
+                           .rangeRoundBands([0, xRangeWidth],0.3);
+
+  // y比例尺
+      var maxProfit = d3.max(data[data.length - 1].sales, function(d){ return d.y0 + d.y ;})
+
+      var yRangeWidth = height - padding.top - padding.bottom;
+
+      var yScale = d3.scale.linear()
+                           .domain([0,maxProfit])
+                           .range([0, yRangeWidth]);
+
+// 创建svg画布
+      var svg = d3.select("body")
+                  .append("svg")
+                  .attr("width", width)
+                  .attr("height", height);
+        
+// 颜色
+      var colors = d3.scale.category10();
+
+      var groups = svg.selectAll("g")
+                      .data(data)
+                      .enter()
+                      .append("g")
+                      .style('fill', function(d,i){ return colors(i); });
+
+// 矩形
+      var rects = groups.selectAll("rect")
+                        .data(function(d){ return d.sales; })
+                        .enter()
+                        .append("rect")
+                        .attr("x",function(d){ return xScale(d.year)})
+                        .attr("y",function(d){ return yRangeWidth - yScale(d.y0 + d.y);})
+                        .attr("width",function(d){ return xScale.rangeBand();})
+                        .attr('height',function(d){ return yScale(d.y);} )
+                        .attr('transform', 'translate(' + padding.left + ',' + padding.top + ')')
+                        .on("mouseover",function(d,i){  //下面是提示的动画设置
+                              var xPosition = parseFloat(d3.select(this).attr("x")) + xScale.rangeBand()/2 + padding.left;
+                              var yPosition = parseFloat(d3.select(this).attr("y")) + parseFloat(d3.select(this).attr("height")/3 +padding.top);
+
+                              d3.select("#tooltip")
+                                .style("left",xPosition + "px")
+                                .style("top",yPosition + "px")
+                                .select("#profit")
+                                .text(d.profit);
+
+                              d3.select("#tooltip").classed("hidden",false);
+                            })
+                        .on("mouseout",function(){
+                             d3.select("#tooltip").classed("hidden",true);
+                            });
+
+  // 坐标轴
+        var xAxis = d3.svg.axis()
+        .scale(xScale)
+        .orient("bottom");
+    
+        // 把y比例尺映射范围倒置一下
+        yScale.range([yRangeWidth, 0]);
+  
+        var yAxis = d3.svg.axis()
+                          .scale(yScale)
+                          .orient("left");
+        
+        // 坐标轴平移
+        svg.append("g")
+           .attr("class","axis")
+           .attr("transform","translate(" + padding.left + "," + (height - padding.bottom) +  ")")
+           .call(xAxis);
+        
+        svg.append("g")
+           .attr("class","axis")
+           .attr("transform","translate(" + padding.left + "," + (height - padding.bottom - yRangeWidth) +  ")")
+           .call(yAxis); 
+
+// 添加图形标志
+
+        var labHeight = 50;
+        var labRadius = 10;
+
+        // 注意这里的lab是添加在groups里的，这样就不用修改颜色了，因为前面的groups已经关联了颜色
+        var labCircle = groups.append("circle")
+                              .attr('cx',function(d){ return width - padding.right*1.1;} )
+                              .attr("cy",function(d,i){ return padding.top*2 + labHeight*i;})
+                              .attr('r',labRadius );
+
+        var labText = groups.append('text')
+                            .attr('x',function(d){ return width - padding.right*0.9;} )
+                            .attr("y",function(d,i){ return padding.top*2 + labHeight*i;})
+                            .attr("dy",labRadius/2)
+                            .attr("font-size","14")
+                            .text(function(d){ return d.name;});
+  </script>
+  <p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp鼠标移动到柱形图上方时会跳出tooltip提示，显示当前柱形图的收益数据</p>
+</body>
+</html>

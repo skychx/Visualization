@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Chord</title>
+  <script src="d3/d3.v3.js"></script>
+</head>
+<body>
+  <style type="text/css">
+
+    text{
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    .innerPath{
+      stroke: #000;
+      stroke-width: 0.5000px;
+  }
+/* 利用！importent把样式优先级提到最高，但也是一种无奈之举，因为不知道如何合理调节样式实现hover动画效果 */
+/* 利用了一个css3的transiton属性实现动画过渡 */
+  .innerPath:hover{
+    fill: yellow !important;
+    opacity: 0.8 !important;
+    transition: all 0.3s;
+  }
+
+  p{
+    text-align: center;
+  }
+
+  </style>
+</body>
+
+    <script type="text/javascript">
+// 初始数据
+      var h = 450;
+      var w = 1000;
+      var cityName = [ "北京" , "上海" , "广州" , "深圳" , "香港"  ];
+
+      // 必须是一个方阵矩阵  
+      var population = [
+          [ 1000,  3045 , 4567 , 1234 , 3714 ],
+          [ 3214,  2000 , 2060 , 124  , 3234 ],
+          [ 8761,  6545 , 3000 , 8045 , 647  ],
+          [ 3211,  1067 , 3214 , 4000 , 1006 ],
+          [ 2146,  1034 , 6745 , 4764 , 5000 ]
+        ];
+
+// 转换数据
+      var chord = d3.layout.chord()
+                           .padding(0.03)
+                           .sortGroups(d3.descending)
+                           .sortSubgroups(d3.ascending)
+                           .matrix(population);
+
+// 输出观察装换后的数据结构
+      console.log(chord.groups());
+      console.log(chord.chords());
+
+// 创建svg画布
+      var svg = d3.select("body")
+                  .append("svg")
+                  .attr('width',w)
+                  .attr("height",h);
+
+// 确定弦图位置在svg中间
+      var gChord = svg.append("g")
+                      .attr('transform', 'translate(' + w/2 + ',' + h/2 + ')');
+
+      var gOuter = gChord.append("g");
+      var gInner = gChord.append("g");
+
+// svg内部结构
+
+// <svg>
+//   <gChord>
+//     <gOuter>  </gOuter>
+//     <gInner>  </gInner>
+//   </gChord> 
+// </svg>
+
+// 颜色
+      var colors = d3.scale.category10();
+
+// 内径外径
+      var innerRadius = h/2 * 0.8;
+      var outerRadius = innerRadius*1.1;
+
+// 调用弧生成器
+      var arcOuter = d3.svg.arc()
+                  .innerRadius(innerRadius)
+                  .outerRadius(outerRadius);
+
+// 绘制圆环
+      gOuter.selectAll(".outerPath")
+                .data(chord.groups()) // 传入转化后的数据
+                .enter()
+                .append("path")
+                .attr('class', 'outerPath')
+                .attr('fill', function(d){ return colors(d.index) })
+                .attr("d",arcOuter);
+
+// 添加文字
+      gOuter.selectAll("text")
+            .data(chord.groups())
+            .enter()
+            .append("text")
+            .each(function(d,i){ //为绑定的数据添加名字
+              d.angle = (d.startAngle + d.endAngle)/2; //计算当前弧的中心角度
+              d.name = cityName[i];
+            })
+            .attr("dy",".35em") // y轴方向上进行偏移
+            .attr("text-anchor",'middle') //文字对齐方式？或者说文字的锚点设置为中部，旋转时以中部为中心旋转
+            .attr("transform",function(d){ //设置位置的属性
+              var result = "rotate(" + (d.angle * 180 / Math.PI) + ")"; //旋转（先把弧度制转为角度制）
+              result += "translate(0," + -1.0 * (outerRadius + 10 ) + ")"; //偏移到圆环外
+              if (d.angle > Math.PI * 2/3 && d.angle < Math.PI * 4/3 ){ result += "rotate(180)"; }; //下方文字再旋转（防止字是倒的）
+              return result; 
+            })
+            .text(function(d){
+              return d.name;
+            });
+
+// 创建弦创建器
+      var arcInner = d3.svg.chord()
+                           .radius(innerRadius);
+
+// 内部的弦
+      gInner.selectAll(".innerPath")
+            .data(chord.chords())
+            .enter()
+            .append("path")
+            .attr("class", "innerPath")
+            .attr("d",arcInner)
+            .style('opacity', '0.618')
+            .style('fill', function(d){ return colors(d.source.index ); });
+
+      // gInner.selectAll("path")
+      //       .on("mouseover",function(d,i){
+      //         d3.select(this)
+      //           .style('fill', 'yellow');
+      //       })
+      //       .on("mouseout",function(d,i){
+      //         d3.select(this)
+      //         .transition()
+      //         .duration(300)
+      //         .style('fill', colors(d.source.index));
+      //       });
+
+// 设置外部圆环选择动画
+      gOuter.selectAll(".outerPath")
+            .on("mouseover",fade(0.0))
+            .on("mouseout",fade(0.618));
+
+      function fade(opacity){
+        return function(g,i){
+          gInner.selectAll(".innerPath")
+                .filter(function(d){
+                  return d.source.index != i && d.target.index != i; //没有连接焦点圆环的弦才可return
+                })
+                .transition()
+                .duration(300)
+                .style('opacity', opacity);
+        };
+      };
+    </script>
+    <p>1.当鼠标移动到内部弦上时，弦变为黄色;</p>
+    <p>2.当鼠标移动到外部圆环上时，仅当前节点的弦可见。</p>
+</body>
+</html>
